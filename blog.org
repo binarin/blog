@@ -1,0 +1,17 @@
+#+AUTHOR: Alexey Lebedeff
+#+EMAIL: binarin@binarin.ru
+#+TODO: TODO___ READY__ | DONE___(d!)
+#+STARTUP: nologstatesreversed
+#+OPTIONS: d:nil <:nil ^:nil c:nil toc:nil todo:nil num:nil p:nil pri:nil stat:nil
+#+OPTIONS: tags:nil timestamp:nil
+* Pages
+** About                                                                                               :page:
+* Posts
+** DONE___ Test post                                                                              :post:test:
+    :LOGBOOK:
+    - State "DONE___"    from "READY__"    [2016-11-15 Вт 17:30]
+    - State "DONE___"    from "READY__"    [2016-11-15 Вт 18:47]
+    :END:
+** TODO___ RabbitMQ in k8s with autocluster                                                            :post:
+** TODO___ DRM and respect                                                                             :post:
+** TODO___ Debugging RabbitMQ startup                                                                  :post:
