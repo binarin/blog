@@ -15,6 +15,10 @@
    :PROPERTIES:
    :ID:       d4875dc1-4b4c-4f51-b589-935498e2b555
    :END:
+** DONE___ Test entry
+   :LOGBOOK:
+   - State "DONE___"    from "READY__"    [2016-11-15 Вт 20:07]
+   :END:
 ** TODO___ RabbitMQ in k8s with autocluster                                                            :post:
 ** TODO___ DRM and respect                                                                             :post:
 ** TODO___ Debugging RabbitMQ startup                                                                  :post:
