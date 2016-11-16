@@ -1,6 +1,11 @@
 @import "variables.less";
 @import "mixins.less";
 
+// Suppress top-level heading from org-mode exported post/page
+h1#sec-1, h2#sec-1, h3#sec-1, h4#sec-1 {
+          display: none;
+}
+
 // Global Components
 
 body {

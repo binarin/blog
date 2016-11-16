@@ -1,9 +1,15 @@
 /*!
  * Clean Blog v1.0.0 (http://startbootstrap.com)
- * Copyright 2015 Start Bootstrap
+ * Copyright 2016 Start Bootstrap
  * Licensed under MIT (https://spdx.org/licenses/MIT)
  */
 
+h1#sec-1,
+h2#sec-1,
+h3#sec-1,
+h4#sec-1 {
+  display: none;
+}
 body {
   font-family: 'Lora', 'Times New Roman', serif;
   font-size: 20px;

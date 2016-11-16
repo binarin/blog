@@ -16,6 +16,15 @@
    :ID:       d4875dc1-4b4c-4f51-b589-935498e2b555
    :END:
    Some content here.
+
+*** Some sub-heading
+
+    And some more content!
+
+*** Another sub-heading
+
+    Another piece of content.
+
 ** DONE___ Test entry                                                                                  :post:
    :LOGBOOK:
    - State "DONE___"    from "READY__"    [2016-11-15 Вт 20:07]
