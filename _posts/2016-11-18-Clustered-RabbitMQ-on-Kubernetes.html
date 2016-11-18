@@ -1,0 +1,152 @@
+---
+title: Clustered RabbitMQ on Kubernetes
+draft: true
+layout: post
+---
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1"><a id="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa" name="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa"></a>Clustered RabbitMQ on Kubernetes</h2>
+<div class="outline-text-2" id="text-1">
+
+<p>
+There are a lot of possible approaches to RabbitMQ clustering on
+top of k8s. Here I document some pitfalls common to all those
+approaches, and then describe the approach that was adopted for
+Fuel CCP project.
+</p>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328" name="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
+<div class="outline-text-3" id="text-1-1">
+
+<p>
+Running RubbitMQ cluster inside k8s poses a series of interesting
+problems. The very first problem is what names to use so rabbits
+can see each other. Here are some examples of what form that names
+could take:
+</p>
+<ul class="org-ul">
+<li><code>rabbit@hostname</code>
+</li>
+<li><code>rabbit@hostname.domainname</code>
+</li>
+<li><code>rabbit@172.17.0.4</code>
+</li>
+</ul>
+
+<p>
+Even before trying to start any rabbits, you need to be sure that
+containers can reach each other using selected naming scheme -
+e.g. <code>ping</code> should work with the part that comes after the <code>@</code>.
+</p>
+
+<p>
+Erlang distribution (which is actively used by RabbitMQ) can run
+in one of two naming modes: short names or long names. Rule of
+thumb is that it's long when it contains <code>.</code>, and short
+otherwise. For name examples from above that means that the first
+one is the short name, and the second and the third are the long
+names.
+</p>
+
+<p>
+Looking at all this we see that on k8s we have following options
+for naming nodes:
+</p>
+<ul class="org-ul">
+<li>Use <a href="http://kubernetes.io/docs/user-guide/petset/">PetSets</a> so we will have some stable DNS names
+</li>
+<li>Use IP-addresses and some sort of automatic peer discovery (like
+<a href="https://github.com/aweber/rabbitmq-autocluster/">autocluster plugin</a>)
+</li>
+</ul>
+
+<p>
+Both this options require running in long-name mode, but the way
+in which DNS/hostnames are configured inside k8s pods is
+incompatible with RabbitMQ versions prior to 3.6.6 (<a href="https://github.com/rabbitmq/rabbitmq-server/issues/890/">fix itself</a>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">Clustering gotchas</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+One of important things to know about RabbitMQ clusters is that
+when a node joins to a cluster, it's data will be lost no matter
+what. It doesn't matter in the most common case when it's the
+empty node that is joining to the cluster - we have nothing to
+loose in this case. But if we had 2 nodes that operated
+independently for some time and accumulated some data, there is no
+way to join them without any losses (note that restoring a cluster
+after network-split or node outage is just a special case of the
+same thing with data loss). For a specific workload you can invent
+some workarounds, like draining (manually or automatically) the
+nodes that are bound to be reset. Or using mirrored queues with
+all their overhead. But there is just no way for making such
+solution robust, automatic and universal.
+</p>
+
+<p>
+So our choice of automatic clustering solution is heavily
+influenced by what kinds of data losses we can tolerate for our
+concrete workloads.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Cluster formation</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+Assuming that you've solved all naming-related problems and can
+cluster your rabbits manually using <code>rabbitmqctl</code>, it's time to
+make our cluster assembly automatic. But as we seen in the
+previous section, there is no one-size-fits-all solution for that
+problem. And here I'm going to describe one such solution that is
+suitable for workloads where we don't care if some data is
+lost. One example of such workload is doing RPC, where clients
+just retry their (preferably idempotent) requests after any
+error/timeout. And this is exactly what's happening with RPC
+calls performed by various components of OpenStack.
+</p>
+
+<p>
+With that assumption in mind, we can start designing our solution.
+</p>
+
+<p>
+Given that we don't care about any individual RabbitMQ node, it
+doesn't make sense to use k8s PetSets. autocluster plugin is our
+obvious candidate for forming cluster from a bunch of disposable
+pods. Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%2520Settings">autocluster documentation</a> we end with some config like:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-erlang">{autocluster, [
+      {backend, etcd}
+     ,{autocluster_failure, stop}
+     ,{cleanup_interval, 30}
+     ,{cluster_cleanup, true}
+     ,{cleanup_warn_only, false}
+     ,{etcd_ttl, 15}
+     ,{etcd_scheme, http}
+     ,{etcd_host, <span style="color: #CC9393;">"etcd"</span>}
+     ,{etcd_port, 1234}
+]}
+</pre>
+</div>
+
+
+
+
+
+<p>
+node_health_check
+properly clustered
+</p>
+</div>
+</div>
+</div>
