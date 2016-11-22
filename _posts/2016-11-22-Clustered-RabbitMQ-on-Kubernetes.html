@@ -12,7 +12,7 @@ layout: post
 There are a lot of possible approaches to RabbitMQ clustering on
 top of k8s. This post is about the approach that was adopted by
 Mirantis for Fuel CCP project. But most pitfals are common for
-every possible approach to clustering, so first sections can be an
+all approaches to RabbitMQ clustering, so first sections can be an
 interesting read even if you want to come up with you own solution.
 </p>
 </div>
@@ -223,10 +223,13 @@ current node and on the discovery node.
 
 <p>
 All this clustering checks are implemented in separate <a href="https://github.com/Mirantis/rabbitmq-autocluster/commit/5fee57752a0788bd2358d3f09eae76d4da67f039">commit</a> and
-can be invoked using ~rabbitmqctl eval
-'autocluster:cluster_health_check_report().'~.
+can be invoked using:
 </p>
+<div class="org-src-container">
 
+<pre class="src src-erlang">rabbitmqctl eval <span style="color: #CC9393;">'autocluster:cluster_health_check_report().'</span>
+</pre>
+</div>
 <p>
 Using this 2 <code>rabbitmqctl</code> command we can detect any problem with
 our rabbit node and stop it immediately, so k8s will have a chance
