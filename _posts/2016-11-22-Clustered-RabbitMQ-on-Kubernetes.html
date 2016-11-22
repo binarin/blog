@@ -1,0 +1,254 @@
+---
+title: Clustered RabbitMQ on Kubernetes
+draft: true
+layout: post
+---
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1"><a id="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa" name="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa"></a>Clustered RabbitMQ on Kubernetes</h2>
+<div class="outline-text-2" id="text-1">
+
+<p>
+There are a lot of possible approaches to RabbitMQ clustering on
+top of k8s. This post is about the approach that was adopted by
+Mirantis for Fuel CCP project. But most pitfals are common for
+every possible approach to clustering, so first sections can be an
+interesting read even if you want to come up with you own solution.
+</p>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328" name="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
+<div class="outline-text-3" id="text-1-1">
+
+<p>
+Running RubbitMQ cluster inside k8s poses a series of interesting
+problems. The very first problem is what names to use so rabbits
+can see each other. Here are some examples of what form that names
+could take:
+</p>
+<ul class="org-ul">
+<li><code>rabbit@hostname</code>
+</li>
+<li><code>rabbit@hostname.domainname</code>
+</li>
+<li><code>rabbit@172.17.0.4</code>
+</li>
+</ul>
+
+<p>
+Even before trying to start any rabbits, you need to be sure that
+containers can reach each other using selected naming scheme -
+e.g. <code>ping</code> should work with the part that comes after the <code>@</code>.
+</p>
+
+<p>
+Erlang distribution (which is actively used by RabbitMQ) can run
+in one of two naming modes: short names or long names. Rule of
+thumb is that it's long when it contains <code>.</code>, and short
+otherwise. For name examples from above that means that the first
+one is the short name, and the second and the third are the long
+names.
+</p>
+
+<p>
+Looking at all this we see that on k8s we have following options
+for naming nodes:
+</p>
+<ul class="org-ul">
+<li>Use <a href="http://kubernetes.io/docs/user-guide/petset/">PetSets</a> so we will have some stable DNS names
+</li>
+<li>Use IP-addresses and some sort of automatic peer discovery (like
+<a href="https://github.com/aweber/rabbitmq-autocluster/">autocluster plugin</a>)
+</li>
+</ul>
+
+<p>
+Both this options require running in long-name mode, but the way
+in which DNS/hostnames are configured inside k8s pods is
+incompatible with RabbitMQ versions prior to 3.6.6 (<a href="https://github.com/rabbitmq/rabbitmq-server/issues/890/">fix itself</a>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">Clustering gotchas</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+One of important things to know about RabbitMQ clusters is that
+when a node joins to a cluster, it's data will be lost no matter
+what. It doesn't matter in the most common case - when it's the
+empty node that is joining to the cluster, as we have nothing to
+loose in this case. But if we had 2 nodes that operated
+independently for some time and accumulated some data, there is no
+way to join them without any losses (note that restoring a cluster
+after network-split or node outage is just a special case of the
+same thing with data loss). For a specific workload you can invent
+some workarounds, like draining (manually or automatically) the
+nodes that are bound to be reset. But there is just no way for
+making such solution robust, automatic and universal.
+</p>
+
+<p>
+So our choice of automatic clustering solution is heavily
+influenced by what kinds of data losses we can tolerate for our
+concrete workloads.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Cluster formation</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+Assuming that you've solved all naming-related problems and can
+cluster your rabbits manually using <code>rabbitmqctl</code>, it's time to
+make our cluster assembly automatic. But as we seen in the
+previous section, there is no one-size-fits-all solution for that
+problem.
+</p>
+
+<p>
+One such very specific solution is described further. It's only
+suitable for workloads where we don't care if some data is lost
+along with a server that went down or got disconnected. One
+example of such workload is doing RPC, where clients just retry
+their (preferably idempotent) requests after any
+error/timeout. Because by the time a server recovers from a
+failure, RPC request will be stale and no longer relevant. And
+this is exactly what's happening with RPC calls performed by
+various components of OpenStack.
+</p>
+
+<p>
+Bearing all of the above in mind, we can start desiging our
+solution. The less state the better, so using IP-addresses is
+preferable to using PetSets. And the autocluster plugin is our
+obvious candidate for forming a cluster from a bunch of disposable
+dynamic nodes.
+</p>
+
+<p>
+Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%2520Settings">autocluster documentation</a> we end with at least the
+following configuration options:
+</p>
+<ul class="org-ul">
+<li><code>{backend, etcd}</code> - it's almost arbitary choice, <code>consul</code> or
+<code>k8s</code> would've worked as well. The only reason for choosing it
+was that it's easier to test - you can download <code>etcd</code> binary,
+run it without any parameters and just start forming clusters on
+localhost.
+</li>
+<li><code>{autocluster_failure, stop}</code> - pod that failed to join to
+cluster is useless for us, so bail out and hope that next
+restart will happen in a more friendly environment
+</li>
+<li><code>{cluster_cleanup, true}</code>, <code>{cleanup_interval, 30}</code>,
+<code>{cleanup_warn_only, false}</code>, <code>{etcd_ttl, 15}</code>. Node is
+registered in etcd only after it's successfully joined cluster
+and fully started up. This registration TTL is constantly
+updated while the node is alive. If the node dies (or fails to
+update TTL in any other way), it's forcefully kicked from the
+cluster. So even if the failed node will be restarted with the
+same IP, it'll be able to join cluster afresh.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">Unexpected races</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+If you've tried assembling a cluster several times with the config
+from above, you could've noticed that sometimes it can assemble
+several different unconnected clusters. This happens because the
+only protection against startup races in autocluster is some
+random delay during node startup - and with a very bad timing
+every node can decide that it is the first node (i.e. there is no
+other records in etcd) and just start in unclustered mode.
+</p>
+
+<p>
+This problem lead to the developement of a pretty big <a href="https://github.com/aweber/rabbitmq-autocluster/pull/98">patch</a> for
+autocluster. It adds proper startup locking - node acquires
+startup lock early in startup, and releases it only after it had
+properly registered itself in backend. Only <code>etcd</code> backend is
+supported at the moment, but others can be added easily (by
+implementing just 2 new callbacks in backend module).
+</p>
+
+<p>
+Another solution to that problem are k8s PetSets, as they can
+perform startup orchestration - with only one node performing
+startup at any given time. But they are currently considered alpha
+feature. And the patch above provides provides this functionality
+for everyone, not only for k8s users.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-5" class="outline-3">
+<h3 id="sec-1-5">Monitoring</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+The only thing left to make our cluster run unattended is adding
+some monitoring. We need to monitor both rabbit's health and
+whether it's properly clustered with the rest of nodes.
+</p>
+
+<p>
+You may remember the times when <code>rabbitmqctl list_queues</code> /
+<code>rabbitmqctl list_channels</code> was used as a method of
+monitoring. But it's a very bad method: it can't distinguish local
+and remote problems, it creates significant network load. Meet the
+new and shiny <code>rabbitmqctl node_health_check</code> - since <a href="https://github.com/rabbitmq/rabbitmq-server/issues/818">3.6.4</a> it's
+the best way to check the health of any single RabbitMQ node.
+</p>
+
+<p>
+Checking whether node is properly clustered requires several checks:
+</p>
+<ul class="org-ul">
+<li>it is clustered with the best node registered in autocluster
+backend (i.e. the node that new nodes will attempt to join to,
+currently it is first alive node in alphabetical order)
+</li>
+<li>even when node is properly clustered with the discovery node,
+it's data can still be diverged. And this check is not
+transitive, so we need to check partitions list both on the
+current node and on the discovery node.
+</li>
+</ul>
+
+<p>
+All this clustering checks are implemented in separate <a href="https://github.com/Mirantis/rabbitmq-autocluster/commit/5fee57752a0788bd2358d3f09eae76d4da67f039">commit</a> and
+can be invoked using ~rabbitmqctl eval
+'autocluster:cluster_health_check_report().'~.
+</p>
+
+<p>
+Using this 2 <code>rabbitmqctl</code> command we can detect any problem with
+our rabbit node and stop it immediately, so k8s will have a chance
+to do its restarting magic.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-6" class="outline-3">
+<h3 id="sec-1-6">Downloads and references</h3>
+<div class="outline-text-3" id="text-1-6">
+<p>
+If you want to replicate such setup yourself, you'll need a recent
+version of <a href="https://github.com/rabbitmq/rabbitmq-server/releases/tag/rabbitmq_v3_6_6">RabbitMQ</a> and <a href="https://github.com/Mirantis/rabbitmq-autocluster/releases/tag/0.6.1.950">the custom release of the autocluster
+plugin</a> (as the startup locking patch is not yet accepted
+upstream).
+</p>
+
+<p>
+You can also look into <a href="https://github.com/openstack/fuel-ccp-rabbitmq/tree/master/service/files">exact code and config files</a> that are used
+by Fuel CCP, they should be pretty self explanatory.
+</p>
+</div>
+</div>
+</div>
