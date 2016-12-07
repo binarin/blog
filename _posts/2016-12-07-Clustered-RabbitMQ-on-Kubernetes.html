@@ -4,26 +4,26 @@ draft: true
 layout: default
 ---
 
-<div id="outline-container-orgce8f625" class="outline-2">
-<h2 id="orgce8f625"><a id="ID-af061fd8-19c4-49c2-bf9a-a6cf0d3abeb7"></a>Clustered RabbitMQ on Kubernetes</h2>
-<div class="outline-text-2" id="text-orgce8f625">
+<div id="outline-container-org9798536" class="outline-2">
+<h2 id="org9798536"><a id="ID-af061fd8-19c4-49c2-bf9a-a6cf0d3abeb7"></a>Clustered RabbitMQ on Kubernetes</h2>
+<div class="outline-text-2" id="text-org9798536">
 <p>
 There are a lot of possible approaches to RabbitMQ clustering on
-top of k8s. This post is about the approach that was adopted by
-Mirantis for Fuel CCP project. But most pitfals are common for
-all approaches to RabbitMQ clustering, so first sections can be an
+top of k8s. This post is about the clustering approach that was
+adopted for Fuel CCP project. But most pitfals are common for all
+approaches to RabbitMQ clustering, so first sections can be an
 interesting read even if you want to come up with you own solution.
 </p>
 </div>
 
-<div id="outline-container-org4219132" class="outline-3">
-<h3 id="org4219132"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
-<div class="outline-text-3" id="text-org4219132">
+<div id="outline-container-orgaab591d" class="outline-3">
+<h3 id="orgaab591d"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
+<div class="outline-text-3" id="text-orgaab591d">
 <p>
 Running RubbitMQ cluster inside k8s poses a series of interesting
-problems. The very first problem is what names to use so rabbits
-can see each other. Here are some examples of what form that names
-could take:
+problems. The very first problem is what kind of names we should
+use to make rabbits can see each other. Here are some examples of
+such names in different form:
 </p>
 <ul class="org-ul">
 <li><code>rabbit@hostname</code></li>
@@ -59,27 +59,28 @@ for naming nodes:
 <p>
 Both this options require running in long-name mode, but the way
 in which DNS/hostnames are configured inside k8s pods is
-incompatible with RabbitMQ versions prior to 3.6.6 (<a href="https://github.com/rabbitmq/rabbitmq-server/issues/890/">fix itself</a>).
+incompatible with RabbitMQ versions prior to 3.6.6 (<a href="https://github.com/rabbitmq/rabbitmq-server/issues/890/">fix</a>).
 </p>
 </div>
 </div>
 
-<div id="outline-container-orgb3838ca" class="outline-3">
-<h3 id="orgb3838ca">Clustering gotchas</h3>
-<div class="outline-text-3" id="text-orgb3838ca">
+<div id="outline-container-orgc95a3df" class="outline-3">
+<h3 id="orgc95a3df">Clustering gotchas</h3>
+<div class="outline-text-3" id="text-orgc95a3df">
 <p>
-One of important things to know about RabbitMQ clusters is that
-when a node joins to a cluster, it's data will be lost no matter
+Another important things to know about RabbitMQ clusters is that
+when a node joins to a cluster, its data will be lost no matter
 what. It doesn't matter in the most common case - when it's the
 empty node that is joining to the cluster, as we have nothing to
 loose in this case. But if we had 2 nodes that operated
 independently for some time and accumulated some data, there is no
 way to join them without any losses (note that restoring a cluster
 after network-split or node outage is just a special case of the
-same thing with data loss). For a specific workload you can invent
-some workarounds, like draining (manually or automatically) the
-nodes that are bound to be reset. But there is just no way for
-making such solution robust, automatic and universal.
+same thing, and also with data loss). For a specific workload you
+can invent some workarounds, like draining (manually or
+automatically) the nodes that are bound to be reset. But there is
+just no way for making such solution robust, automatic and
+universal.
 </p>
 
 <p>
@@ -90,9 +91,9 @@ concrete workloads.
 </div>
 </div>
 
-<div id="outline-container-orgab3b81e" class="outline-3">
-<h3 id="orgab3b81e">Cluster formation</h3>
-<div class="outline-text-3" id="text-orgab3b81e">
+<div id="outline-container-org4df18d3" class="outline-3">
+<h3 id="org4df18d3">Cluster formation</h3>
+<div class="outline-text-3" id="text-org4df18d3">
 <p>
 Assuming that you've solved all naming-related problems and can
 cluster your rabbits manually using <code>rabbitmqctl</code>, it's time to
@@ -104,7 +105,7 @@ problem.
 <p>
 One such very specific solution is described further. It's only
 suitable for workloads where we don't care if some data is lost
-along with a server that went down or got disconnected. One
+along with a server that went down or got disconnected. An
 example of such workload is doing RPC, where clients just retry
 their (preferably idempotent) requests after any
 error/timeout. Because by the time a server recovers from a
@@ -116,13 +117,13 @@ various components of OpenStack.
 <p>
 Bearing all of the above in mind, we can start desiging our
 solution. The less state the better, so using IP-addresses is
-preferable to using PetSets. And the autocluster plugin is our
-obvious candidate for forming a cluster from a bunch of disposable
-dynamic nodes.
+preferable to using PetSets. And the <a href="http://aweber.github.io/rabbitmq-autocluster/">autocluster</a> plugin is our
+obvious candidate for forming a cluster from a bunch of dynamic
+disposable nodes.
 </p>
 
 <p>
-Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%20Settings">autocluster documentation</a> we end with at least the
+Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%20Settings">autocluster documentation</a> we end setting the
 following configuration options:
 </p>
 <ul class="org-ul">
@@ -146,9 +147,9 @@ same IP, it'll be able to join cluster afresh.</li>
 </div>
 </div>
 
-<div id="outline-container-org5a84bf9" class="outline-3">
-<h3 id="org5a84bf9">Unexpected races</h3>
-<div class="outline-text-3" id="text-org5a84bf9">
+<div id="outline-container-orgd0209a9" class="outline-3">
+<h3 id="orgd0209a9">Unexpected races</h3>
+<div class="outline-text-3" id="text-orgd0209a9">
 <p>
 If you've tried assembling a cluster several times with the config
 from above, you could've noticed that sometimes it can assemble
@@ -178,9 +179,9 @@ for everyone, not only for k8s users.
 </div>
 </div>
 
-<div id="outline-container-org16b0229" class="outline-3">
-<h3 id="org16b0229">Monitoring</h3>
-<div class="outline-text-3" id="text-org16b0229">
+<div id="outline-container-orga12b398" class="outline-3">
+<h3 id="orga12b398">Monitoring</h3>
+<div class="outline-text-3" id="text-orga12b398">
 <p>
 The only thing left to make our cluster run unattended is adding
 some monitoring. We need to monitor both rabbit's health and
@@ -191,9 +192,9 @@ whether it's properly clustered with the rest of nodes.
 You may remember the times when <code>rabbitmqctl list_queues</code> /
 <code>rabbitmqctl list_channels</code> was used as a method of
 monitoring. But it's a very bad method: it can't distinguish local
-and remote problems, it creates significant network load. Meet the
-new and shiny <code>rabbitmqctl node_health_check</code> - since <a href="https://github.com/rabbitmq/rabbitmq-server/issues/818">3.6.4</a> it's
-the best way to check the health of any single RabbitMQ node.
+and remote problems and it creates significant network load. Meet
+the new and shiny <code>rabbitmqctl node_health_check</code> - since <a href="https://github.com/rabbitmq/rabbitmq-server/issues/818">3.6.4</a>
+it's the best way to check the health of any single RabbitMQ node.
 </p>
 
 <p>
@@ -226,9 +227,9 @@ to do its restarting magic.
 </div>
 </div>
 
-<div id="outline-container-org6c9e5bd" class="outline-3">
-<h3 id="org6c9e5bd">Downloads and references</h3>
-<div class="outline-text-3" id="text-org6c9e5bd">
+<div id="outline-container-orgd350034" class="outline-3">
+<h3 id="orgd350034">Downloads and references</h3>
+<div class="outline-text-3" id="text-orgd350034">
 <p>
 If you want to replicate such setup yourself, you'll need a recent
 version of <a href="https://github.com/rabbitmq/rabbitmq-server/releases/tag/rabbitmq_v3_6_6">RabbitMQ</a> and <a href="https://github.com/Mirantis/rabbitmq-autocluster/releases/tag/0.6.1.950">the custom release of the autocluster
