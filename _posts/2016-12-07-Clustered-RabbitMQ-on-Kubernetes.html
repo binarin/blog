@@ -1,13 +1,12 @@
 ---
 title: Clustered RabbitMQ on Kubernetes
 draft: true
-layout: post
+layout: default
 ---
 
-<div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1"><a id="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa" name="ID-6ee0ffcc-0583-4670-a7f1-cc43fa9029aa"></a>Clustered RabbitMQ on Kubernetes</h2>
-<div class="outline-text-2" id="text-1">
-
+<div id="outline-container-orgce8f625" class="outline-2">
+<h2 id="orgce8f625"><a id="ID-af061fd8-19c4-49c2-bf9a-a6cf0d3abeb7"></a>Clustered RabbitMQ on Kubernetes</h2>
+<div class="outline-text-2" id="text-orgce8f625">
 <p>
 There are a lot of possible approaches to RabbitMQ clustering on
 top of k8s. This post is about the approach that was adopted by
@@ -17,10 +16,9 @@ interesting read even if you want to come up with you own solution.
 </p>
 </div>
 
-<div id="outline-container-sec-1-1" class="outline-3">
-<h3 id="sec-1-1"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328" name="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
-<div class="outline-text-3" id="text-1-1">
-
+<div id="outline-container-org4219132" class="outline-3">
+<h3 id="org4219132"><a id="ID-4570a4a5-3e5f-4bd8-ad70-8bada282a328"></a>Naming your rabbits</h3>
+<div class="outline-text-3" id="text-org4219132">
 <p>
 Running RubbitMQ cluster inside k8s poses a series of interesting
 problems. The very first problem is what names to use so rabbits
@@ -28,12 +26,9 @@ can see each other. Here are some examples of what form that names
 could take:
 </p>
 <ul class="org-ul">
-<li><code>rabbit@hostname</code>
-</li>
-<li><code>rabbit@hostname.domainname</code>
-</li>
-<li><code>rabbit@172.17.0.4</code>
-</li>
+<li><code>rabbit@hostname</code></li>
+<li><code>rabbit@hostname.domainname</code></li>
+<li><code>rabbit@172.17.0.4</code></li>
 </ul>
 
 <p>
@@ -56,11 +51,9 @@ Looking at all this we see that on k8s we have following options
 for naming nodes:
 </p>
 <ul class="org-ul">
-<li>Use <a href="http://kubernetes.io/docs/user-guide/petset/">PetSets</a> so we will have some stable DNS names
-</li>
+<li>Use <a href="http://kubernetes.io/docs/user-guide/petset/">PetSets</a> so we will have some stable DNS names</li>
 <li>Use IP-addresses and some sort of automatic peer discovery (like
-<a href="https://github.com/aweber/rabbitmq-autocluster/">autocluster plugin</a>)
-</li>
+<a href="https://github.com/aweber/rabbitmq-autocluster/">autocluster plugin</a>)</li>
 </ul>
 
 <p>
@@ -71,9 +64,9 @@ incompatible with RabbitMQ versions prior to 3.6.6 (<a href="https://github.com/
 </div>
 </div>
 
-<div id="outline-container-sec-1-2" class="outline-3">
-<h3 id="sec-1-2">Clustering gotchas</h3>
-<div class="outline-text-3" id="text-1-2">
+<div id="outline-container-orgb3838ca" class="outline-3">
+<h3 id="orgb3838ca">Clustering gotchas</h3>
+<div class="outline-text-3" id="text-orgb3838ca">
 <p>
 One of important things to know about RabbitMQ clusters is that
 when a node joins to a cluster, it's data will be lost no matter
@@ -97,9 +90,9 @@ concrete workloads.
 </div>
 </div>
 
-<div id="outline-container-sec-1-3" class="outline-3">
-<h3 id="sec-1-3">Cluster formation</h3>
-<div class="outline-text-3" id="text-1-3">
+<div id="outline-container-orgab3b81e" class="outline-3">
+<h3 id="orgab3b81e">Cluster formation</h3>
+<div class="outline-text-3" id="text-orgab3b81e">
 <p>
 Assuming that you've solved all naming-related problems and can
 cluster your rabbits manually using <code>rabbitmqctl</code>, it's time to
@@ -129,7 +122,7 @@ dynamic nodes.
 </p>
 
 <p>
-Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%2520Settings">autocluster documentation</a> we end with at least the
+Going through <a href="https://github.com/aweber/rabbitmq-autocluster/wiki/General%20Settings">autocluster documentation</a> we end with at least the
 following configuration options:
 </p>
 <ul class="org-ul">
@@ -137,12 +130,10 @@ following configuration options:
 <code>k8s</code> would've worked as well. The only reason for choosing it
 was that it's easier to test - you can download <code>etcd</code> binary,
 run it without any parameters and just start forming clusters on
-localhost.
-</li>
+localhost.</li>
 <li><code>{autocluster_failure, stop}</code> - pod that failed to join to
 cluster is useless for us, so bail out and hope that next
-restart will happen in a more friendly environment
-</li>
+restart will happen in a more friendly environment</li>
 <li><code>{cluster_cleanup, true}</code>, <code>{cleanup_interval, 30}</code>,
 <code>{cleanup_warn_only, false}</code>, <code>{etcd_ttl, 15}</code>. Node is
 registered in etcd only after it's successfully joined cluster
@@ -150,15 +141,14 @@ and fully started up. This registration TTL is constantly
 updated while the node is alive. If the node dies (or fails to
 update TTL in any other way), it's forcefully kicked from the
 cluster. So even if the failed node will be restarted with the
-same IP, it'll be able to join cluster afresh.
-</li>
+same IP, it'll be able to join cluster afresh.</li>
 </ul>
 </div>
 </div>
 
-<div id="outline-container-sec-1-4" class="outline-3">
-<h3 id="sec-1-4">Unexpected races</h3>
-<div class="outline-text-3" id="text-1-4">
+<div id="outline-container-org5a84bf9" class="outline-3">
+<h3 id="org5a84bf9">Unexpected races</h3>
+<div class="outline-text-3" id="text-org5a84bf9">
 <p>
 If you've tried assembling a cluster several times with the config
 from above, you could've noticed that sometimes it can assemble
@@ -188,9 +178,9 @@ for everyone, not only for k8s users.
 </div>
 </div>
 
-<div id="outline-container-sec-1-5" class="outline-3">
-<h3 id="sec-1-5">Monitoring</h3>
-<div class="outline-text-3" id="text-1-5">
+<div id="outline-container-org16b0229" class="outline-3">
+<h3 id="org16b0229">Monitoring</h3>
+<div class="outline-text-3" id="text-org16b0229">
 <p>
 The only thing left to make our cluster run unattended is adding
 some monitoring. We need to monitor both rabbit's health and
@@ -212,13 +202,11 @@ Checking whether node is properly clustered requires several checks:
 <ul class="org-ul">
 <li>it is clustered with the best node registered in autocluster
 backend (i.e. the node that new nodes will attempt to join to,
-currently it is first alive node in alphabetical order)
-</li>
+currently it is first alive node in alphabetical order)</li>
 <li>even when node is properly clustered with the discovery node,
 it's data can still be diverged. And this check is not
 transitive, so we need to check partitions list both on the
-current node and on the discovery node.
-</li>
+current node and on the discovery node.</li>
 </ul>
 
 <p>
@@ -226,21 +214,21 @@ All this clustering checks are implemented in separate <a href="https://github.c
 can be invoked using:
 </p>
 <div class="org-src-container">
-
 <pre class="src src-erlang">rabbitmqctl eval <span style="color: #CC9393;">'autocluster:cluster_health_check_report().'</span>
 </pre>
 </div>
+
 <p>
-Using this 2 <code>rabbitmqctl</code> command we can detect any problem with
+Using both this <code>rabbitmqctl</code> command we can detect any problem with
 our rabbit node and stop it immediately, so k8s will have a chance
 to do its restarting magic.
 </p>
 </div>
 </div>
 
-<div id="outline-container-sec-1-6" class="outline-3">
-<h3 id="sec-1-6">Downloads and references</h3>
-<div class="outline-text-3" id="text-1-6">
+<div id="outline-container-org6c9e5bd" class="outline-3">
+<h3 id="org6c9e5bd">Downloads and references</h3>
+<div class="outline-text-3" id="text-org6c9e5bd">
 <p>
 If you want to replicate such setup yourself, you'll need a recent
 version of <a href="https://github.com/rabbitmq/rabbitmq-server/releases/tag/rabbitmq_v3_6_6">RabbitMQ</a> and <a href="https://github.com/Mirantis/rabbitmq-autocluster/releases/tag/0.6.1.950">the custom release of the autocluster

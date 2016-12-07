@@ -1,26 +1,21 @@
 # Site settings
-title: "binarin's blog"
-header-img: img/home-bg.jpg
+title: binarin.ru
 email: binarin@binarin.ru
-copyright_name: Alexey Lebedeff
-description: > # this means to ignore newlines until "baseurl:"
-  Nothing special.
-baseurl: ""
-url: "http://binarin.ru"
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "https://binarin.ru" # the base hostname & protocol for your site
 twitter_username: binarin
 github_username:  binarin
-# facebook_username:  StartBootstrap
-email_username:  binarin@binarin.ru
-
-# Google Analytics
-# To enable google analytics, uncomment below line with a valid Google Tracking ID
-# google_tracking_id:
+copyright_name: Alexey Lebedeff
 
 # Build settings
 markdown: kramdown
-highlighter: rouge
-permalink: pretty
 paginate: 5
-exclude: ["less","node_modules","Gruntfile.js","package.json","README.md", "Gemfile"]
+permalink: pretty
+gems:
+  - jekyll-paginate
 
-gems: [jekyll-paginate] # , jekyll-feed
+navigation:
+- text: binarin.ru
+  url: /
+- text: About
+  url: /about/

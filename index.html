@@ -1,23 +1,14 @@
 ---
-layout: page
-description: "Recent Posts"
+layout: default
+title: Latest posts
 ---
-
 {% for post in paginator.posts %}
 {% unless post.draft %}
-<div class="post-preview">
-    <a href="{{ post.url | prepend: site.baseurl }}">
-        <h2 class="post-title">            {{ post.title }}
-        </h2>
-        {% if post.subtitle %}
-        <h3 class="post-subtitle">
-            {{ post.subtitle }}
-        </h3>
-        {% endif %}
-    </a>
-    <p class="post-meta">Posted by {% if post.author %}{{ post.author }}{% else %}{{ site.title }}{% endif %} on {{ post.date | date: "%B %-d, %Y" }}</p>
-</div>
-<hr>
+<div class="blog-post">
+  <h2 class="blog-post-title"><a href="{{post.url | prepend: site.baseurl}}">{{ post.title }}</a></h2>
+  <p class="blog-post-meta">{{ post.date | date: "%b %-d, %Y" }}</p>
+  {{ post.content }}
+</div><!-- /.blog-post -->
 {% endunless %}
 {% endfor %}
 
