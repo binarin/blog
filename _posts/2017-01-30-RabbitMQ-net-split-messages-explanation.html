@@ -1,12 +1,12 @@
 ---
 title: RabbitMQ net-split messages explanation
 draft: false
-layout: post
+layout: default
 ---
 
-<div id="outline-container-org0425833" class="outline-2">
-<h2 id="org0425833"><a id="ID-6380758d-ad57-42a3-910a-bae573d8dae3"></a>RabbitMQ net-split messages explanation</h2>
-<div class="outline-text-2" id="text-org0425833">
+<div id="outline-container-org7898a99" class="outline-2">
+<h2 id="org7898a99"><a id="ID-6380758d-ad57-42a3-910a-bae573d8dae3"></a>RabbitMQ net-split messages explanation</h2>
+<div class="outline-text-2" id="text-org7898a99">
 <p>
 After experiencing a network problem RabbitMQ writes a record to
 logs that looks like this:
@@ -26,9 +26,9 @@ you can reproduce them.
 </p>
 </div>
 
-<div id="outline-container-orgd478224" class="outline-3">
-<h3 id="orgd478224"><code>connection_closed</code></h3>
-<div class="outline-text-3" id="text-orgd478224">
+<div id="outline-container-org99f5897" class="outline-3">
+<h3 id="org99f5897"><code>connection_closed</code></h3>
+<div class="outline-text-3" id="text-org99f5897">
 <p>
 This happens any time when a connection is closed using "normal"
 mechanisms. Some ways to reproduce it:
@@ -42,9 +42,9 @@ mechanisms. Some ways to reproduce it:
 </div>
 </div>
 
-<div id="outline-container-orgb4d0ab3" class="outline-3">
-<h3 id="orgb4d0ab3"><code>net_tick_timeout</code></h3>
-<div class="outline-text-3" id="text-orgb4d0ab3">
+<div id="outline-container-orgeb8a24c" class="outline-3">
+<h3 id="orgeb8a24c"><code>net_tick_timeout</code></h3>
+<div class="outline-text-3" id="text-orgeb8a24c">
 <p>
 Any time when a remote node stops responding - for sender it looks
 like blackholing. Some reasons:
@@ -60,9 +60,9 @@ to saturate network for at least <code>net_tick_timeout</code>.</li>
 </div>
 </div>
 
-<div id="outline-container-org4e26bff" class="outline-3">
-<h3 id="org4e26bff"><code>disconnect</code></h3>
-<div class="outline-text-3" id="text-org4e26bff">
+<div id="outline-container-org988781d" class="outline-3">
+<h3 id="org988781d"><code>disconnect</code></h3>
+<div class="outline-text-3" id="text-org988781d">
 <p>
 Explicit disconnect performed using
 <code>erlang:disconnect_node/1</code>. Either by some internal RabbitMQ
@@ -71,9 +71,9 @@ mechanism or by somebody messing with <code>rabbitmqctl eval</code>.
 </div>
 </div>
 
-<div id="outline-container-org7868fb1" class="outline-3">
-<h3 id="org7868fb1"><code>etimedout</code></h3>
-<div class="outline-text-3" id="text-org7868fb1">
+<div id="outline-container-orgc7dd9a8" class="outline-3">
+<h3 id="orgc7dd9a8"><code>etimedout</code></h3>
+<div class="outline-text-3" id="text-orgc7dd9a8">
 <p>
 Another quite interesting reason. I believe that this can happen
 only when OS TCP stack is tuned in a such way that TCP timeout is
@@ -92,9 +92,9 @@ echo 2 &gt; tcp_retries1
 </div>
 </div>
 
-<div id="outline-container-org9166cbc" class="outline-3">
-<h3 id="org9166cbc"><code>econnreset</code></h3>
-<div class="outline-text-3" id="text-org9166cbc">
+<div id="outline-container-org7df91bf" class="outline-3">
+<h3 id="org7df91bf"><code>econnreset</code></h3>
+<div class="outline-text-3" id="text-org7df91bf">
 <p>
 This is the most strange of all reasons which I've seen only in
 production logs but can't reproduce myself. One very probable
