@@ -1,0 +1,107 @@
+---
+title: RabbitMQ net-split messages explanation
+draft: false
+layout: post
+---
+
+<div id="outline-container-org0425833" class="outline-2">
+<h2 id="org0425833"><a id="ID-6380758d-ad57-42a3-910a-bae573d8dae3"></a>RabbitMQ net-split messages explanation</h2>
+<div class="outline-text-2" id="text-org0425833">
+<p>
+After experiencing a network problem RabbitMQ writes a record to
+logs that looks like this:
+</p>
+
+<pre class="example">
+=INFO REPORT==== 30-Jan-2017::19:04:04 ===
+node 'rabbit@192.168.155.11' down: connection_closed
+</pre>
+
+<p>
+In this case the reason is <code>connection_closed</code>. But sometimes it
+may not be evident what this actually means or what could have
+caused this error. Especially in some outright bizzare situations.
+Here I'm trying to document all the reasons that I've seen and how
+you can reproduce them.
+</p>
+</div>
+
+<div id="outline-container-orgd478224" class="outline-3">
+<h3 id="orgd478224"><code>connection_closed</code></h3>
+<div class="outline-text-3" id="text-orgd478224">
+<p>
+This happens any time when a connection is closed using "normal"
+mechanisms. Some ways to reproduce it:
+</p>
+<ul class="org-ul">
+<li>Stop a remote RabbitMQ node</li>
+<li>Send RST from a remote node, e.g. using <code>iptables</code></li>
+<li>Attach to a running ErlangVM with <code>gdb</code> and do <code>call
+      close(some-fd)</code> here</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-orgb4d0ab3" class="outline-3">
+<h3 id="orgb4d0ab3"><code>net_tick_timeout</code></h3>
+<div class="outline-text-3" id="text-orgb4d0ab3">
+<p>
+Any time when a remote node stops responding - for sender it looks
+like blackholing. Some reasons:
+</p>
+<ul class="org-ul">
+<li>Loss of network connectivity between 2 machines</li>
+<li>Death of a remote machine</li>
+<li>Firewall rule that drops packets</li>
+<li>Somebody is sending a very big chunk of data through RabbitMQ
+cluster channel. E.g. such a big AMQP messages that it's enough
+to saturate network for at least <code>net_tick_timeout</code>.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org4e26bff" class="outline-3">
+<h3 id="org4e26bff"><code>disconnect</code></h3>
+<div class="outline-text-3" id="text-org4e26bff">
+<p>
+Explicit disconnect performed using
+<code>erlang:disconnect_node/1</code>. Either by some internal RabbitMQ
+mechanism or by somebody messing with <code>rabbitmqctl eval</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org7868fb1" class="outline-3">
+<h3 id="org7868fb1"><code>etimedout</code></h3>
+<div class="outline-text-3" id="text-org7868fb1">
+<p>
+Another quite interesting reason. I believe that this can happen
+only when OS TCP stack is tuned in a such way that TCP timeout is
+less than <code>net_tick_timeout</code>. On Linux this can be reproduced with
+some extreme tuning:
+</p>
+
+<pre class="example">
+cd /proc/sys/net/ipv4
+echo 2 &gt; tcp_keepalive_intvl
+echo 1 &gt; tcp_keepalive_probes
+echo 2 &gt; tcp_keepalive_time
+echo 1 &gt; tcp_retries1
+echo 2 &gt; tcp_retries1
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org9166cbc" class="outline-3">
+<h3 id="org9166cbc"><code>econnreset</code></h3>
+<div class="outline-text-3" id="text-org9166cbc">
+<p>
+This is the most strange of all reasons which I've seen only in
+production logs but can't reproduce myself. One very probable
+explanation is that RST packet has arrived with an exceptionally
+bad timing - just after a socket was returned from <code>epoll</code> as a
+ready one, but before read/write operation on it actually started.
+</p>
+</div>
+</div>
+</div>
